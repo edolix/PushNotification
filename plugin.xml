@@ -6,7 +6,7 @@
     version="1.0.0">
 
   <name>PushNotification</name>
-	<author>Venkat</author>
+	<author>Edoardo Gallo</author>
 
 	<description>
 		This plugin allows your application to receive push notifications on Android, iOS and WP8 devices.
@@ -18,7 +18,7 @@
 	<license>MIT</license>
 
 	<js-module src="www/PushNotification.js" name="PushNotification">
-        <clobbers target="PushNotification" />
+    <clobbers target="plugins.PushNotification" />
 	</js-module>
 
 	<engines>
@@ -75,7 +75,7 @@
             <preference name="showmessageinnotification" value="true" />
             <preference name="defaultnotificationmessage" value="You have a new message." />
 		</config-file>
-        
+
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <!-- This permission ensures that no other application can intercept your ADM messages. "[YOUR PACKAGE NAME]" is your package name as defined in your <manifest> tag. -->
             <permission android:name="$PACKAGE_NAME.permission.RECEIVE_ADM_MESSAGE" android:protectionLevel="signature" />
@@ -99,13 +99,13 @@
                     <action android:name="com.amazon.device.messaging.intent.RECEIVE" />
                     <category android:name="$PACKAGE_NAME" />
                 </intent-filter>
-            </receiver>		
+            </receiver>
         </config-file>
-        
+
         <source-file src="src/amazon/PushPlugin.java" target-dir="src/com/amazon/cordova/plugin" />
         <source-file src="src/amazon/ADMMessageHandler.java" target-dir="src/com/amazon/cordova/plugin" />
         <source-file src="src/amazon/ADMHandlerActivity.java" target-dir="src/com/amazon/cordova/plugin" />
-       		
+
 	</platform>
 
 	<!-- ios -->

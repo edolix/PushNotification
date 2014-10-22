@@ -52,7 +52,7 @@ This plugin is for use with [Cordova](http://cordova.apache.org/), and allows yo
 
 ### Manual Installation for Amazon Fire OS
 
-[comment]: <> 1) Install the ADM library
+1) Install the ADM library
 
 - Download the [Amazon Mobile App SDK](https://developer.amazon.com/public/resources/development-tools/sdk) and unzip.
 - Create a folder called `ext_libs` in your project's `platforms/amazon-fireos` folder.
