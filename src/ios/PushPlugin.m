@@ -54,41 +54,41 @@
     id soundArg = [options objectForKey:@"sound"];
     id alertArg = [options objectForKey:@"alert"];
 
-    if ([badgeArg isKindOfClass:[NSString class]])
-    {
-        if ([badgeArg isEqualToString:@"true"])
-            notificationTypes |= UIRemoteNotificationTypeBadge;
-    }
-    else if ([badgeArg boolValue])
+    if( [badgeArg isKindOfClass:[NSString class]] && [badgeArg isEqualToString:@"true"] ){
         notificationTypes |= UIRemoteNotificationTypeBadge;
-
-    if ([soundArg isKindOfClass:[NSString class]])
-    {
-        if ([soundArg isEqualToString:@"true"])
-            notificationTypes |= UIRemoteNotificationTypeSound;
+    }else if( [badgeArg boolValue] ){
+        notificationTypes |= UIRemoteNotificationTypeBadge;
     }
-    else if ([soundArg boolValue])
+
+    if( [soundArg isKindOfClass:[NSString class]] && [soundArg isEqualToString:@"true"] ){
         notificationTypes |= UIRemoteNotificationTypeSound;
-
-    if ([alertArg isKindOfClass:[NSString class]])
-    {
-        if ([alertArg isEqualToString:@"true"])
-            notificationTypes |= UIRemoteNotificationTypeAlert;
+    }else if( [soundArg boolValue] ){
+        notificationTypes |= UIRemoteNotificationTypeSound;
     }
-    else if ([alertArg boolValue])
+
+    if( [alertArg isKindOfClass:[NSString class]] && [alertArg isEqualToString:@"true"] ){
         notificationTypes |= UIRemoteNotificationTypeAlert;
+    }else if( [alertArg boolValue] ){
+        notificationTypes |= UIRemoteNotificationTypeAlert;
+    }
 
     self.callback = [options objectForKey:@"ecb"];
-
-    if (notificationTypes == UIRemoteNotificationTypeNone)
+    if( notificationTypes == UIRemoteNotificationTypeNone )
         NSLog(@"PushPlugin.register: Push notification type is set to none");
 
     isInline = NO;
 
+    if( [UIApplication respondsToSelector:@selector(registerUserNotificationSettings:)] ){
+        UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:(notificationTypes) categories:nil];
+        [UIApplication registerUserNotificationSettings:settings];
+    }else {
+        [UIApplication registerForRemoteNotificationTypes:notificationTypes];
+    }
+
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:notificationTypes];
 
-	if (notificationMessage)			// if there is a pending startup notification
-		[self notificationReceived];	// go ahead and process it
+	if( notificationMessage )			// if there is a pending startup notification
+	   [self notificationReceived];	// go ahead and process it
 }
 
 /*
