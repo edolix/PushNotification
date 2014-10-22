@@ -33,6 +33,26 @@
 @synthesize notificationCallbackId;
 @synthesize callback;
 
+- (void)pluginInitialize
+{
+    NSLog(@"PUSH PLUGIN INITIALIZE");
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(RemoteNotificationRegistrationSuccess:)
+                                               name:@"CDVRemoteNotification" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(RemoteNotificationRegistrationFail:)
+                                               name:@"CDVRemoteNotificationError" object:nil];
+}
+
+-(void)RemoteNotificationRegistrationSuccess:(NSNotification *)notification
+{
+  NSLog(@"PLUGIN - RemoteNotificationRegistrationSuccess %@",notification);
+}
+
+-(void)RemoteNotificationRegistrationFail:(NSError *)error
+{
+  NSLog(@"PLUGIN - RemoteNotificationRegistrationFail %@", error);
+}
 
 - (void)unregister:(CDVInvokedUrlCommand*)command;
 {
@@ -48,33 +68,7 @@
 
   NSMutableDictionary* options = [command.arguments objectAtIndex:0];
 
-  // UIRemoteNotificationType notificationTypes = UIRemoteNotificationTypeNone;
-  // id badgeArg = [options objectForKey:@"badge"];
-  // id soundArg = [options objectForKey:@"sound"];
-  // id alertArg = [options objectForKey:@"alert"];
-
-  // if( [badgeArg isKindOfClass:[NSString class]] && [badgeArg isEqualToString:@"true"] ){
-  //     notificationTypes |= UIRemoteNotificationTypeBadge;
-  // }else if( [badgeArg boolValue] ){
-  //     notificationTypes |= UIRemoteNotificationTypeBadge;
-  // }
-
-  // if( [soundArg isKindOfClass:[NSString class]] && [soundArg isEqualToString:@"true"] ){
-  //     notificationTypes |= UIRemoteNotificationTypeSound;
-  // }else if( [soundArg boolValue] ){
-  //     notificationTypes |= UIRemoteNotificationTypeSound;
-  // }
-
-  // if( [alertArg isKindOfClass:[NSString class]] && [alertArg isEqualToString:@"true"] ){
-  //     notificationTypes |= UIRemoteNotificationTypeAlert;
-  // }else if( [alertArg boolValue] ){
-  //     notificationTypes |= UIRemoteNotificationTypeAlert;
-  // }
-  // if( notificationTypes == UIRemoteNotificationTypeNone )
-  //     NSLog(@"PushPlugin.register: Push notification type is set to none");
-
   self.callback = [options objectForKey:@"ecb"];
-
   isInline = NO;
 
   if( [[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)] ){
@@ -84,8 +78,6 @@
     UIRemoteNotificationType myTypes = UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeAlert | UIRemoteNotificationTypeSound;
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:myTypes];
   }
-
-  // [[UIApplication sharedApplication] registerForRemoteNotificationTypes:notificationTypes];
 
   if( notificationMessage )         // if there is a pending startup notification
        [self notificationReceived]; // go ahead and process it
@@ -148,64 +140,59 @@
   #endif
 }
 
-- (void)didFailToRegisterForRemoteNotificationsWithError:(NSError *)error
-{
-  [self failWithMessage:@"" withError:error];
-}
-
 - (void)notificationReceived {
-NSLog(@"Notification received");
+  NSLog(@"Notification received");
 
-if (notificationMessage && self.callback) {
-  if( isInline ){
-    [notificationMessage setValue:[NSNumber numberWithInt:1] forKey:@"foreground"];
-    isInline = NO;
-  }else {
-    [notificationMessage setValue:[NSNumber numberWithInt:0] forKey:@"foreground"];
+  if (notificationMessage && self.callback) {
+    if( isInline ){
+      [notificationMessage setValue:[NSNumber numberWithInt:1] forKey:@"foreground"];
+      isInline = NO;
+    }else {
+      [notificationMessage setValue:[NSNumber numberWithInt:0] forKey:@"foreground"];
+    }
+
+    NSMutableString *jsonStr = [NSMutableString stringWithString:@"{"];
+
+    [self parseDictionary:notificationMessage intoJSON:jsonStr];
+    //
+    //        if( isInline ){
+    //            [jsonStr appendFormat:@"foreground:\"%d\"", 1];
+    //            isInline = NO;
+    //        }else {
+    //            [jsonStr appendFormat:@"foreground:\"%d\"", 0];
+    //        }
+    [jsonStr appendString:@"}"];
+
+    NSLog(@"Msg: %@", jsonStr);
+    NSString * jsCallBack = [NSString stringWithFormat:@"%@(%@);", self.callback, jsonStr];
+    [self.webView stringByEvaluatingJavaScriptFromString:jsCallBack];
+    self.notificationMessage = nil;
   }
-
-  NSMutableString *jsonStr = [NSMutableString stringWithString:@"{"];
-
-  [self parseDictionary:notificationMessage intoJSON:jsonStr];
-  //
-  //        if( isInline ){
-  //            [jsonStr appendFormat:@"foreground:\"%d\"", 1];
-  //            isInline = NO;
-  //        }else {
-  //            [jsonStr appendFormat:@"foreground:\"%d\"", 0];
-  //        }
-  [jsonStr appendString:@"}"];
-
-  NSLog(@"Msg: %@", jsonStr);
-  NSString * jsCallBack = [NSString stringWithFormat:@"%@(%@);", self.callback, jsonStr];
-  [self.webView stringByEvaluatingJavaScriptFromString:jsCallBack];
-  self.notificationMessage = nil;
-}
 }
 
 // reentrant method to drill down and surface all sub-dictionaries' key/value pairs into the top level json
 -(void)parseDictionary:(NSDictionary *)inDictionary intoJSON:(NSMutableString *)jsonString
 {
-NSArray *keys = [inDictionary allKeys];
-NSString *key;
+  NSArray *keys = [inDictionary allKeys];
+  NSString *key;
 
-for (key in keys)
-{
-  id thisObject = [inDictionary objectForKey:key];
+  for (key in keys)
+  {
+    id thisObject = [inDictionary objectForKey:key];
 
-  if( [thisObject isKindOfClass:[NSDictionary class]] ){
-    [self parseDictionary:thisObject intoJSON:jsonString];
-  }else if( [thisObject isKindOfClass:[NSString class]] ){
-    [jsonString appendFormat:@"\"%@\":\"%@\",",
-     key,
-     [[[[inDictionary objectForKey:key]
-        stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
-       stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""]
-      stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"]];
-  }else {
-    [jsonString appendFormat:@"\"%@\":\"%@\",", key, [inDictionary objectForKey:key]];
+    if( [thisObject isKindOfClass:[NSDictionary class]] ){
+      [self parseDictionary:thisObject intoJSON:jsonString];
+    }else if( [thisObject isKindOfClass:[NSString class]] ){
+      [jsonString appendFormat:@"\"%@\":\"%@\",",
+       key,
+       [[[[inDictionary objectForKey:key]
+          stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
+         stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""]
+        stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"]];
+    }else {
+      [jsonString appendFormat:@"\"%@\":\"%@\",", key, [inDictionary objectForKey:key]];
+    }
   }
-}
 }
 
 - (void)setApplicationIconBadgeNumber:(CDVInvokedUrlCommand *)command {
@@ -248,4 +235,8 @@ for (key in keys)
   [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
 }
 
+-(void) dealloc
+{
+
+}
 @end
