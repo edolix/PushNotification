@@ -52,7 +52,7 @@ This plugin is for use with [Cordova](http://cordova.apache.org/), and allows yo
 
 ### Manual Installation for Amazon Fire OS
 
-1) Install the ADM library
+[//]: # 1) Install the ADM library
 
 - Download the [Amazon Mobile App SDK](https://developer.amazon.com/public/resources/development-tools/sdk) and unzip.
 - Create a folder called `ext_libs` in your project's `platforms/amazon-fireos` folder.
@@ -299,7 +299,7 @@ To be called as soon as the device becomes ready.
 ```js
 $("#app-status-ul").append('<li>registering ' + device.platform + '</li>');
 if ( device.platform == 'android' || device.platform == 'Android' || device.platform == "amazon-fireos" ){
-    
+
     pushNotification.register(
     successHandler,
     errorHandler,
@@ -397,8 +397,8 @@ function onNotification(e) {
 		if ( e.foreground )
 		{
 			$("#app-status-ul").append('<li>--INLINE NOTIFICATION--' + '</li>');
-			
-			// on Android soundname is outside the payload. 
+
+			// on Android soundname is outside the payload.
 			// On Amazon FireOS all custom attributes are contained within payload
 			var soundfile = e.soundname || e.payload.sound;
 			// if the notification contains a soundname, play it.
