@@ -35,7 +35,7 @@
 
 - (void)pluginInitialize
 {
-    NSLog(@"PUSH PLUGIN INITIALIZE");
+    // NSLog(@"PUSH PLUGIN INITIALIZE");
     [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(RemoteNotificationRegistrationSuccess:)
                                                name:@"CDVRemoteNotification" object:nil];
@@ -46,7 +46,52 @@
 
 -(void)RemoteNotificationRegistrationSuccess:(NSNotification *)notification
 {
-  NSLog(@"PLUGIN - RemoteNotificationRegistrationSuccess %@",notification);
+  // NSLog(@"PLUGIN - RemoteNotificationRegistrationSuccess %@",notification);
+
+  NSMutableDictionary *results = [NSMutableDictionary dictionary];
+  NSString *token = [notification object];
+  [results setValue:token forKey:@"deviceToken"];
+  NSLog(@"TOKEN: %@", token);
+
+  #if !TARGET_IPHONE_SIMULATOR
+      // Get Bundle Info for Remote Registration (handy if you have more than one app)
+      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"] forKey:@"appName"];
+      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"] forKey:@"appVersion"];
+
+      // Check what Notifications the user has turned on.  We registered for all three, but they may have manually disabled some or all of them.
+      NSUInteger rntypes = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
+
+      // Set the defaults to disabled unless we find otherwise...
+      NSString *pushBadge = @"disabled";
+      NSString *pushAlert = @"disabled";
+      NSString *pushSound = @"disabled";
+
+      // Check what Registered Types are turned on. This is a bit tricky since if two are enabled, and one is off, it will return a number 2... not telling you which
+      // one is actually disabled. So we are literally checking to see if rnTypes matches what is turned on, instead of by number. The "tricky" part is that the
+      // single notification types will only match if they are the ONLY one enabled.  Likewise, when we are checking for a pair of notifications, it will only be
+      // true if those two notifications are on.  This is why the code is written this way
+      if(rntypes & UIRemoteNotificationTypeBadge){
+          pushBadge = @"enabled";
+      }
+      if(rntypes & UIRemoteNotificationTypeAlert) {
+          pushAlert = @"enabled";
+      }
+      if(rntypes & UIRemoteNotificationTypeSound) {
+          pushSound = @"enabled";
+      }
+
+      [results setValue:pushBadge forKey:@"pushBadge"];
+      [results setValue:pushAlert forKey:@"pushAlert"];
+      [results setValue:pushSound forKey:@"pushSound"];
+
+      // Get the users Device Model, Display Name, Token & Version Number
+      UIDevice *dev = [UIDevice currentDevice];
+      [results setValue:dev.name forKey:@"deviceName"];
+      [results setValue:dev.model forKey:@"deviceModel"];
+      [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
+
+      [self successWithMessage:[NSString stringWithFormat:@"%@", token]];
+  #endif
 }
 
 -(void)RemoteNotificationRegistrationFail:(NSError *)error
@@ -90,55 +135,6 @@
   NSLog(@"JSStatement %@",jsStatement);
 }
 */
-
-- (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
-  NSMutableDictionary *results = [NSMutableDictionary dictionary];
-  NSString *token = [[[[deviceToken description] stringByReplacingOccurrencesOfString:@"<"withString:@""]
-                      stringByReplacingOccurrencesOfString:@">" withString:@""]
-                     stringByReplacingOccurrencesOfString: @" " withString: @""];
-  [results setValue:token forKey:@"deviceToken"];
-
-  NSLog(@"TOKEN: %@", token);
-  #if !TARGET_IPHONE_SIMULATOR
-      // Get Bundle Info for Remote Registration (handy if you have more than one app)
-      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"] forKey:@"appName"];
-      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"] forKey:@"appVersion"];
-
-      // Check what Notifications the user has turned on.  We registered for all three, but they may have manually disabled some or all of them.
-      NSUInteger rntypes = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
-
-      // Set the defaults to disabled unless we find otherwise...
-      NSString *pushBadge = @"disabled";
-      NSString *pushAlert = @"disabled";
-      NSString *pushSound = @"disabled";
-
-      // Check what Registered Types are turned on. This is a bit tricky since if two are enabled, and one is off, it will return a number 2... not telling you which
-      // one is actually disabled. So we are literally checking to see if rnTypes matches what is turned on, instead of by number. The "tricky" part is that the
-      // single notification types will only match if they are the ONLY one enabled.  Likewise, when we are checking for a pair of notifications, it will only be
-      // true if those two notifications are on.  This is why the code is written this way
-      if(rntypes & UIRemoteNotificationTypeBadge){
-          pushBadge = @"enabled";
-      }
-      if(rntypes & UIRemoteNotificationTypeAlert) {
-          pushAlert = @"enabled";
-      }
-      if(rntypes & UIRemoteNotificationTypeSound) {
-          pushSound = @"enabled";
-      }
-
-      [results setValue:pushBadge forKey:@"pushBadge"];
-      [results setValue:pushAlert forKey:@"pushAlert"];
-      [results setValue:pushSound forKey:@"pushSound"];
-
-      // Get the users Device Model, Display Name, Token & Version Number
-      UIDevice *dev = [UIDevice currentDevice];
-      [results setValue:dev.name forKey:@"deviceName"];
-      [results setValue:dev.model forKey:@"deviceModel"];
-      [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
-
-      [self successWithMessage:[NSString stringWithFormat:@"%@", token]];
-  #endif
-}
 
 - (void)notificationReceived {
   NSLog(@"Notification received");
@@ -232,6 +228,7 @@
   NSString        *errorMessage = (error) ? [NSString stringWithFormat:@"%@ - %@", message, [error localizedDescription]] : message;
   CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
 
+  NSLog(@"CB JS: %@", self.callbackId);
   [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
 }
 
