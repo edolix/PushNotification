@@ -30,69 +30,51 @@
 @synthesize isInline;
 
 @synthesize callbackId;
-@synthesize notificationCallbackId;
 @synthesize callback;
 
 - (void)pluginInitialize
 {
-    // NSLog(@"PUSH PLUGIN INITIALIZE");
+  // NSLog(@"PUSH PLUGIN INITIALIZE");
+  // Check if user has remote notifications enabled
+  if( ![self pushEnabled] ){
+    // if are not enabled, addObserver for registration
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(RemoteNotificationRegistrationSuccess:)
-                                               name:@"CDVRemoteNotification" object:nil];
+                                            selector:@selector(RemoteNotificationRegistrationSuccess:)
+                                            name:@"CDVRemoteNotification" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(RemoteNotificationRegistrationFail:)
-                                               name:@"CDVRemoteNotificationError" object:nil];
+                                            selector:@selector(RemoteNotificationRegistrationFail:)
+                                            name:@"CDVRemoteNotificationError" object:nil];
+  }
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                          selector:@selector(RemoteNotificationChecker:)
+                                          name:@"UIApplicationDidFinishLaunchingNotification" object:nil];
 }
 
+// This code will be called immediately after application:didFinishLaunchingWithOptions:. We need
+// to process notifications in cold-start situations
+- (void)RemoteNotificationChecker:(NSNotification *)notification
+{
+  // NSDictionary *pushDic = [launchOptions objectForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
+  // if( pushDic != nil ){
+  //   NSLog(@"DIC: %@", pushDic);
+  // }
+
+  NSDictionary *launchOptions = [notification userInfo];
+  if( launchOptions ){
+    // LANCIARE LA NOTIFICA PUSH VERSO IL JAVASCRIPT
+    NSLog(@"PLUGIN - RemoteNotificationChecker NOTIF %@", [launchOptions objectForKey: @"UIApplicationLaunchOptionsRemoteNotificationKey"]);
+    // self.launchNotification = [launchOptions objectForKey: @"UIApplicationLaunchOptionsRemoteNotificationKey"];
+  }
+}
+
+#if !TARGET_IPHONE_SIMULATOR
 -(void)RemoteNotificationRegistrationSuccess:(NSNotification *)notification
 {
-  // NSLog(@"PLUGIN - RemoteNotificationRegistrationSuccess %@",notification);
-
-  NSMutableDictionary *results = [NSMutableDictionary dictionary];
   NSString *token = [notification object];
-  [results setValue:token forKey:@"deviceToken"];
-  NSLog(@"TOKEN: %@", token);
-
-  #if !TARGET_IPHONE_SIMULATOR
-      // Get Bundle Info for Remote Registration (handy if you have more than one app)
-      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"] forKey:@"appName"];
-      [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"] forKey:@"appVersion"];
-
-      // Check what Notifications the user has turned on.  We registered for all three, but they may have manually disabled some or all of them.
-      NSUInteger rntypes = [[UIApplication sharedApplication] enabledRemoteNotificationTypes];
-
-      // Set the defaults to disabled unless we find otherwise...
-      NSString *pushBadge = @"disabled";
-      NSString *pushAlert = @"disabled";
-      NSString *pushSound = @"disabled";
-
-      // Check what Registered Types are turned on. This is a bit tricky since if two are enabled, and one is off, it will return a number 2... not telling you which
-      // one is actually disabled. So we are literally checking to see if rnTypes matches what is turned on, instead of by number. The "tricky" part is that the
-      // single notification types will only match if they are the ONLY one enabled.  Likewise, when we are checking for a pair of notifications, it will only be
-      // true if those two notifications are on.  This is why the code is written this way
-      if(rntypes & UIRemoteNotificationTypeBadge){
-          pushBadge = @"enabled";
-      }
-      if(rntypes & UIRemoteNotificationTypeAlert) {
-          pushAlert = @"enabled";
-      }
-      if(rntypes & UIRemoteNotificationTypeSound) {
-          pushSound = @"enabled";
-      }
-
-      [results setValue:pushBadge forKey:@"pushBadge"];
-      [results setValue:pushAlert forKey:@"pushAlert"];
-      [results setValue:pushSound forKey:@"pushSound"];
-
-      // Get the users Device Model, Display Name, Token & Version Number
-      UIDevice *dev = [UIDevice currentDevice];
-      [results setValue:dev.name forKey:@"deviceName"];
-      [results setValue:dev.model forKey:@"deviceModel"];
-      [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
-
-      [self successWithMessage:[NSString stringWithFormat:@"%@", token]];
-  #endif
+  [self successWithMessage:[NSString stringWithFormat:@"%@", token]];
 }
+#endif
 
 -(void)RemoteNotificationRegistrationFail:(NSError *)error
 {
@@ -136,59 +118,35 @@
 }
 */
 
-- (void)notificationReceived {
-  NSLog(@"Notification received");
-
-  if (notificationMessage && self.callback) {
-    if( isInline ){
-      [notificationMessage setValue:[NSNumber numberWithInt:1] forKey:@"foreground"];
-      isInline = NO;
-    }else {
-      [notificationMessage setValue:[NSNumber numberWithInt:0] forKey:@"foreground"];
-    }
-
-    NSMutableString *jsonStr = [NSMutableString stringWithString:@"{"];
-
-    [self parseDictionary:notificationMessage intoJSON:jsonStr];
-    //
-    //        if( isInline ){
-    //            [jsonStr appendFormat:@"foreground:\"%d\"", 1];
-    //            isInline = NO;
-    //        }else {
-    //            [jsonStr appendFormat:@"foreground:\"%d\"", 0];
-    //        }
-    [jsonStr appendString:@"}"];
-
-    NSLog(@"Msg: %@", jsonStr);
-    NSString * jsCallBack = [NSString stringWithFormat:@"%@(%@);", self.callback, jsonStr];
-    [self.webView stringByEvaluatingJavaScriptFromString:jsCallBack];
-    self.notificationMessage = nil;
+- (BOOL)pushEnabled
+{
+  UIApplication *application = [UIApplication sharedApplication];
+  if( [application respondsToSelector:@selector(isRegisteredForRemoteNotifications)] ){
+    return [application isRegisteredForRemoteNotifications];
+  }else {
+    UIRemoteNotificationType types = [application enabledRemoteNotificationTypes];
+    return (types & UIRemoteNotificationTypeAlert);
   }
 }
 
-// reentrant method to drill down and surface all sub-dictionaries' key/value pairs into the top level json
--(void)parseDictionary:(NSDictionary *)inDictionary intoJSON:(NSMutableString *)jsonString
-{
-  NSArray *keys = [inDictionary allKeys];
-  NSString *key;
-
-  for (key in keys)
-  {
-    id thisObject = [inDictionary objectForKey:key];
-
-    if( [thisObject isKindOfClass:[NSDictionary class]] ){
-      [self parseDictionary:thisObject intoJSON:jsonString];
-    }else if( [thisObject isKindOfClass:[NSString class]] ){
-      [jsonString appendFormat:@"\"%@\":\"%@\",",
-       key,
-       [[[[inDictionary objectForKey:key]
-          stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
-         stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""]
-        stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"]];
-    }else {
-      [jsonString appendFormat:@"\"%@\":\"%@\",", key, [inDictionary objectForKey:key]];
+- (void)notificationReceived {
+    NSLog(@"Notification received");
+    if( notificationMessage && self.callback ){
+        // Using mutabledictonary to add "foreground" key (using only "aps" key ...)
+        NSMutableDictionary *mutable = [[notificationMessage objectForKey:@"aps"] mutableCopy];
+        [mutable setObject:[NSNumber numberWithInt:isInline?1:0] forKey:@"foreground"];
+        isInline = NO;
+        NSError *error;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:mutable options:0 error:&error];
+        if( jsonData ){
+            NSString *JSONString = [[NSString alloc] initWithBytes:[jsonData bytes] length:[jsonData length] encoding:NSUTF8StringEncoding];
+            NSString * jsCallBack = [NSString stringWithFormat:@"%@(%@);", self.callback, JSONString];
+            [self.webView stringByEvaluatingJavaScriptFromString:jsCallBack];
+        } else {
+            NSLog(@"PushPlugin::notificationReceived - invalid json: %@", error);
+        }
+        notificationMessage = nil;
     }
-  }
 }
 
 - (void)setApplicationIconBadgeNumber:(CDVInvokedUrlCommand *)command {
@@ -219,21 +177,13 @@
 -(void)successWithMessage:(NSString *)message
 {
   CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
-
   [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
 }
 
 -(void)failWithMessage:(NSString *)message withError:(NSError *)error
 {
-  NSString        *errorMessage = (error) ? [NSString stringWithFormat:@"%@ - %@", message, [error localizedDescription]] : message;
+  NSString *errorMessage = (error) ? [NSString stringWithFormat:@"%@ - %@", message, [error localizedDescription]] : message;
   CDVPluginResult *commandResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMessage];
-
-  NSLog(@"CB JS: %@", self.callbackId);
   [self.commandDelegate sendPluginResult:commandResult callbackId:self.callbackId];
-}
-
--(void) dealloc
-{
-
 }
 @end
