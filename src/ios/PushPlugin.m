@@ -55,16 +55,10 @@
 // to process notifications in cold-start situations
 - (void)RemoteNotificationChecker:(NSNotification *)notification
 {
-  // NSDictionary *pushDic = [launchOptions objectForKey:@"UIApplicationLaunchOptionsRemoteNotificationKey"];
-  // if( pushDic != nil ){
-  //   NSLog(@"DIC: %@", pushDic);
-  // }
-
   NSDictionary *launchOptions = [notification userInfo];
   if( launchOptions ){
-    // LANCIARE LA NOTIFICA PUSH VERSO IL JAVASCRIPT
-    NSLog(@"PLUGIN - RemoteNotificationChecker NOTIF %@", [launchOptions objectForKey: @"UIApplicationLaunchOptionsRemoteNotificationKey"]);
-    // self.launchNotification = [launchOptions objectForKey: @"UIApplicationLaunchOptionsRemoteNotificationKey"];
+    notificationMessage = [launchOptions objectForKey: @"UIApplicationLaunchOptionsRemoteNotificationKey"];
+    [self notificationReceived];
   }
 }
 
@@ -130,7 +124,7 @@
 }
 
 - (void)notificationReceived {
-    NSLog(@"Notification received");
+    // NSLog(@"Notification received! %@ - %@", notificationMessage, self.callback);
     if( notificationMessage && self.callback ){
         // Using mutabledictonary to add "foreground" key (using only "aps" key ...)
         NSMutableDictionary *mutable = [[notificationMessage objectForKey:@"aps"] mutableCopy];

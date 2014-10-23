@@ -4,7 +4,7 @@
 
 @implementation AppDelegate (notification)
 
-NSMutableDictionary *launchNotification;
+NSDictionary *launchNotification;
 
 - (id) getCommandInstance:(NSString*)className
 {
@@ -33,7 +33,6 @@ NSMutableDictionary *launchNotification;
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application {
-    NSLog(@"applicationDidBecomeActive %@", launchNotification);
     if( launchNotification ){
        PushPlugin *pushHandler = [self getCommandInstance:@"PushPlugin"];
        pushHandler.notificationMessage = launchNotification;
